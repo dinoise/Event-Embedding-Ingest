@@ -1,0 +1,25 @@
+#############################
+# Environment & Configuration
+#############################
+python-dotenv  # Environment variables management
+
+#############################
+# Cloud Function
+#############################
+functions-framework==3.*
+
+#############################
+# SQLAlchemy for the Database
+#############################
+flask-sqlalchemy
+pymysql
+cryptography
+marshmallow-sqlalchemy
+psycopg2-binary
+pgvector
+
+#############################
+# Google Cloud libraries
+#############################
+google-cloud-aiplatform
+google-cloud-secret-manager
