@@ -1,15 +1,13 @@
 # Event Embedding Ingest
 
-A Pub/Sub-triggered Google Cloud Function that ingests event messages and stores them, along with their vector embeddings, in a PostgreSQL/`pgvector` database — for later semantic search/retrieval.
-
-> **Status:** early-stage prototype. `main.py` currently calls `EventController.create_event` with placeholder test data (`"Mensaje de prueba"` and a fixed `[0.5] * 768` vector) instead of generating a real embedding from the incoming Pub/Sub message.
+A Pub/Sub-triggered Google Cloud Function that ingests event messages, generates their vector embeddings via Vertex AI, and stores them in a PostgreSQL/`pgvector` database — for later semantic search/retrieval.
 
 ## Requirements
 
 - Python 3.x
 - A PostgreSQL database with the `pgvector` extension enabled
-- Google Cloud credentials with access to Secret Manager (database credentials are fetched via `get_secret`, not read from plain env vars) and Vertex AI (`google-cloud-aiplatform` is a dependency, for embedding generation)
-- Dependencies in `requirements.txt`, notably `functions-framework` (local/dev server for Cloud Functions), `flask-sqlalchemy`, `psycopg2-binary`, and `pgvector`
+- Google Cloud credentials with access to Secret Manager (database credentials are fetched via `get_secret`, not read from plain env vars) and Vertex AI (`langchain-google-vertexai` generates the embeddings)
+- Dependencies in `requirements.txt`, notably `functions-framework` (local/dev server for Cloud Functions), `flask-sqlalchemy`, `psycopg2-binary`, `pgvector`, and `langchain-google-vertexai`
 
 ## Setup
 
@@ -17,15 +15,17 @@ A Pub/Sub-triggered Google Cloud Function that ingests event messages and stores
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+cp .env.example .env  # fill in your values
 ```
 
-Create a `.env` file with the required variables (see [Environment variables](#environment-variables) below).
-
 ### Environment variables
+
+See `.env.example` for the full list. Key ones:
 
 - `ENV` — `dev` or `prod`, selects the config class in `config.py` (default: `dev`)
 - `GOOGLE_CLOUD_PROJECT` — GCP project ID
 - `CLOUD_VAR` — set automatically in Cloud Run/Cloud Functions; used to detect whether the code is running locally or deployed (affects which DB host secret is used)
+- `EMBEDDING_MODEL_NAME` — Vertex AI embedding model used to generate the 768-dim vectors (e.g. `text-embedding-004`)
 - Database credentials are **not** read directly from env vars — `config.py` holds the *names* of the Secret Manager secrets (`POSTGRE_USR_RAG_REPO_DEV`, `POSTGRE_PASS_RAG_REPO_DEV`, etc.), which are resolved at runtime via `get_secret()`. Ensure those secrets exist in Secret Manager for your project.
 
 ## Running locally
@@ -45,10 +45,11 @@ To simulate a Pub/Sub trigger locally, send a CloudEvent-formatted request with 
 
 ## What it does
 
-1. Receives a Pub/Sub `CloudEvent` and base64-decodes the message payload.
+1. Receives a Pub/Sub `CloudEvent` and base64-decodes the message payload into text.
 2. Initializes a PostgreSQL connection (`init_db`) using credentials resolved from Secret Manager.
-3. Calls `EventController.create_event(...)`, which validates that the embedding vector has exactly 768 dimensions, then inserts a new `EventEmbedding` row (UUID, original message text, embedding vector, timestamp).
-4. Logs success/failure; on unhandled exceptions, returns a 500.
+3. Generates a 768-dimension embedding for the message text via `VertexAIEmbeddings` (model set by `EMBEDDING_MODEL_NAME`).
+4. Calls `EventController.create_event(...)`, which validates the embedding vector's dimensionality, then inserts a new `EventEmbedding` row (UUID, original message text, embedding vector, timestamp).
+5. Logs success/failure; on unhandled exceptions, returns a 500.
 
 ## Project structure
 
@@ -66,5 +67,4 @@ utils/
 
 ## Known gaps
 
-- No real embedding generation yet — the message payload is decoded but not passed through an embedding model; `main.py` sends hardcoded test data instead.
 - No tests.

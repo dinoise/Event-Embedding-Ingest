@@ -5,6 +5,7 @@ class Config:
     """Configuraciones comunes"""
     FLASK_ENV = getenv("FLASK_ENV", "dev")
     PROJECT_ID = getenv("GOOGLE_CLOUD_PROJECT")
+    EMBEDDING_MODEL_NAME = getenv("EMBEDDING_MODEL_NAME")
     
 class DevelopmentConfig(Config):
     """Configuraciones para desarrollo"""
